@@ -64,12 +64,28 @@ def wait_x_minutes(x_value:int):
         time.sleep(60)
         logger.info(f'{x+1} minute(s) have passed.')
 
+def prompt_for_minutes() -> int:
+    minutes = ''
+    while not minutes.isnumeric():
+        minutes = input("Enter the number of minutes you want the program to run: ")
+    return int(minutes)
+
+def prompt_for_verbose_arg():
+    response = input("Do you want the console to output data about the state of the script (Y/N): ")
+    if response.upper() == 'Y':
+        logging.basicConfig(level=logging.INFO)
+
+def optional_skip():
+    response = input("Do you want to run MegaSync backups? (Y/N): ")
+    if response.upper() == 'N':
+        quit()
+
 if __name__ == "__main__":
 
     # Initialize logger
     logger = logging.getLogger(__name__)
 
-    # Argument handler - minutes
+    # Argument handler - minutes, verbose output, prompt parameters
     run_minutes = 5
     if len(sys.argv) > 1:
         try:
@@ -78,8 +94,12 @@ if __name__ == "__main__":
         except:
             pass
         if len(sys.argv) > 2:
-            if sys.argv[2] == '-v':
+            if '-v' in sys.argv:
                 logging.basicConfig(level=logging.INFO)
+            if '-a'  in sys.argv:
+                optional_skip()
+                run_minutes = prompt_for_minutes()
+                prompt_for_verbose_arg()
         
     cache_path = os.path.join(os.path.dirname(__file__), 'cache.txt')
     create_cache_file(cache_path)
