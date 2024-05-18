@@ -17,6 +17,9 @@ The first one is a positional optional argument that specifies the number of min
 The other arguments' order does not matter:
 • You can use '-v' if you want the console to print out information about the execution of the script.
 • You can use '-a' if you want the program to prompt you to input the arguments when it runs. You may find this useful if you don't want to run the script everyday or if you'd like to adjust the time manually each time the program runs depending on your changes.
+
+Tip: If you are only going to use the first argument and don't want to see the console pop up when the script runs, you can safely change the extension on the main program from ".py" to ".pyw".
+
 # How should you use it
 I use (and would recommend using) Windows Task Scheduler to run it periodically and automatically.
 
