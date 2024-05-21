@@ -25,3 +25,5 @@ I use (and would recommend using) Windows Task Scheduler to run it periodically 
 
 # System
 Tested on Windows 11. Should also work on Windows 10. Not sure about older versions of Windows. Will most likely not work on other OS.
+
+The libraries used include os, subprocess, time, sys and logging.
