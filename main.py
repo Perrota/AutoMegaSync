@@ -1,17 +1,19 @@
-import os
+import argparse
+import logging
 import subprocess
 import time
-import sys
-import logging
+from pathlib import Path
+
+import psutil
 
 DEFAULT_EXE_PATH = r'C:\ProgramData\MEGAsync\MEGAsync.exe'
 
-def create_cache_file(path:str) -> str:
+def create_cache_file(path:str) -> None:
     
     # Create if doesn't exist
-    if not os.path.exists(path):
+    if not Path(path).exists():
         logger.info("Cache not found. Creating new.")
-        with open(path, 'w') as f:
+        with Path(path).open(mode='w') as f:
             f.write(DEFAULT_EXE_PATH)
             logger.info(f"Cache created on {path}.")
     else:
@@ -30,7 +32,7 @@ def extract_valid_exe_path(cache_file_path:str) -> str:
         exe_path = f_lines[0]
 
         # Validate cached exe path
-        while not os.path.exists(exe_path) or not os.path.basename(exe_path).endswith('.exe'):
+        while not Path(exe_path).exists or not Path(exe_path).name.endswith('.exe'):
             exe_path = input("The specified file does not exists or is invalid. Try again or press q to exit: ")
             if exe_path == 'q':
                 quit()
@@ -40,24 +42,17 @@ def extract_valid_exe_path(cache_file_path:str) -> str:
         logger.info("Valid path provided.")
         return exe_path
 
-def initialize_process(validated_path:str):
+def initialize_process(validated_path:str) -> int:
     logger.info("Initializing process...")
-    os.popen(validated_path)
+    proc = subprocess.Popen([validated_path])
+    return proc.pid
 
-def terminate_process():
+def terminate_process(pid: int) -> None:
 
-    logger.info('Locating process to terminate...')
-    subps = subprocess.Popen(['powershell', 'get-process'], stdout=subprocess.PIPE)
-    output, _ = subps.communicate()
+    logger.info('Terminating process...')
+    psutil.Process(pid).kill()
+    logger.info('Process ended.')
 
-    for line in output.splitlines():
-        if 'MEGAsync' in str(line):
-            pid_int = int(line.split(None)[5])
-            logger.info(f'Process found at number {pid_int}.')
-            logger.info('Killing it.')
-            os.kill(pid_int, 9)
-            logger.info('Process ended.')
-    
 def wait_x_minutes(x_value:int):
     logger.info("Awaiting program.")
     for x in range(x_value):
@@ -70,14 +65,11 @@ def prompt_for_minutes() -> int:
         minutes = input("Enter the number of minutes you want the program to run: ")
     return int(minutes)
 
-def prompt_for_verbose_arg():
-    response = input("Do you want the console to output data about the state of the script (Y/N): ")
-    if response.upper() == 'Y':
-        logging.basicConfig(level=logging.INFO)
-
 def optional_skip():
     response = input("Do you want to run MegaSync backups? (Y/N): ")
-    if response.upper() == 'N':
+    if response.upper() == 'Y':
+        return
+    else:
         quit()
 
 if __name__ == "__main__":
@@ -86,24 +78,24 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     # Argument handler - minutes, verbose output, prompt parameters
-    run_minutes = 5
-    if len(sys.argv) > 1:
-        try:
-            arg_minutes = int(sys.argv[1])
-            run_minutes = arg_minutes
-        except:
-            pass
-        if len(sys.argv) > 2:
-            if '-v' in sys.argv:
-                logging.basicConfig(level=logging.INFO)
-            if '-a'  in sys.argv:
-                optional_skip()
-                run_minutes = prompt_for_minutes()
-                prompt_for_verbose_arg()
+    parser = argparse.ArgumentParser(description="This file runs MegaSync and turns it off automatically.")
+    parser.add_argument('minutes', nargs='?', default=5, type=int, help='The amount of minutes the app will run.')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Activates extra output from the console.')
+    parser.add_argument('-a', '--arguments', action='store_true', help='Will take you through the wizard.')
+
+    args = parser.parse_args()
+
+    run_minutes = args.minutes
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO)
+    if args.arguments:
+        optional_skip()
+        run_minutes = prompt_for_minutes()
         
-    cache_path = os.path.join(os.path.dirname(__file__), 'cache.txt')
-    create_cache_file(cache_path)
-    valid_exe_path = extract_valid_exe_path(cache_path)
-    initialize_process(valid_exe_path)
+    # Main code process
+    cache_path = Path(__file__).parent / 'cache.txt'
+    create_cache_file(str(cache_path))
+    valid_exe_path = extract_valid_exe_path(str(cache_path))
+    pid = initialize_process(valid_exe_path)
     wait_x_minutes(run_minutes)
-    terminate_process()
+    terminate_process(pid)
