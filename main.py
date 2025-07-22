@@ -6,38 +6,33 @@ from pathlib import Path
 
 import psutil
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_EXE_PATH = r'C:\ProgramData\MEGAsync\MEGAsync.exe'
 
-def create_cache_file(path:str) -> None:
-    
-    # Create if doesn't exist
-    if not Path(path).exists():
+def ensure_cache_file_existence(path:Path) -> None:
+    if not path.exists():
         logger.info("Cache not found. Creating new.")
-        with Path(path).open(mode='w') as f:
+        with path.open(mode='w+', encoding='utf-8') as f:
             f.write(DEFAULT_EXE_PATH)
             logger.info(f"Cache created on {path}.")
-    else:
-        # Populate with default if exists but it's empty
-        with open(path, 'r+') as f:
-            contents = f.read()
-            if contents == '':
-                logger.info("Empty cache found. Setting default.")
-                f.write(DEFAULT_EXE_PATH)
-            else:
-                logger.info("Existing cached value found.")
 
-def extract_valid_exe_path(cache_file_path:str) -> str:
-    with open(cache_file_path, 'r') as f:
+def extract_valid_exe_path(cache_file_path:Path) -> str:
+    with cache_file_path.open('r', encoding='utf-8') as f:
         f_lines = f.readlines()
-        exe_path = f_lines[0]
+
+        if f_lines:
+            exe_path = f_lines[0].strip()
+        else:
+            exe_path = DEFAULT_EXE_PATH
 
         # Validate cached exe path
-        while not Path(exe_path).exists or not Path(exe_path).name.endswith('.exe'):
-            exe_path = input("The specified file does not exists or is invalid. Try again or press q to exit: ")
+        while not Path(exe_path).exists() or not Path(exe_path).name.endswith('.exe'):
+            exe_path = input("The specified file does not exist or is invalid. Try again or press q to exit: ")
             if exe_path == 'q':
                 quit()
-            with open(cache_file_path, 'w') as f:
-                f.write(exe_path)
+        with cache_file_path.open('w', encoding='utf-8') as f:
+            f.write(exe_path)
 
         logger.info("Valid path provided.")
         return exe_path
@@ -50,8 +45,13 @@ def initialize_process(validated_path:str) -> int:
 def terminate_process(pid: int) -> None:
 
     logger.info('Terminating process...')
-    psutil.Process(pid).kill()
-    logger.info('Process ended.')
+    try:
+        psutil.Process(pid).kill()
+        logger.info('Process ended.')
+    except psutil.NoSuchProcess:
+        logger.error(f'Process with PID {pid} does not exist or has already been terminated.')
+    except RuntimeError as e:
+        logger.error(f'An error occurred while terminating the process: {e}')
 
 def wait_x_minutes(x_value:int):
     logger.info("Awaiting program.")
@@ -74,9 +74,6 @@ def optional_skip():
 
 if __name__ == "__main__":
 
-    # Initialize logger
-    logger = logging.getLogger(__name__)
-
     # Argument handler - minutes, verbose output, prompt parameters
     parser = argparse.ArgumentParser(description="This file runs MegaSync and turns it off automatically.")
     parser.add_argument('minutes', nargs='?', default=5, type=int, help='The amount of minutes the app will run.')
@@ -91,11 +88,11 @@ if __name__ == "__main__":
     if args.arguments:
         optional_skip()
         run_minutes = prompt_for_minutes()
-        
+
     # Main code process
     cache_path = Path(__file__).parent / 'cache.txt'
-    create_cache_file(str(cache_path))
-    valid_exe_path = extract_valid_exe_path(str(cache_path))
+    ensure_cache_file_existence(cache_path)
+    valid_exe_path = extract_valid_exe_path(cache_path)
     pid = initialize_process(valid_exe_path)
     wait_x_minutes(run_minutes)
     terminate_process(pid)
